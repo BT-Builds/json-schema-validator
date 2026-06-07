@@ -64,3 +64,6 @@ curl -X POST https://json-schema-validator.vercel.app/validate \
 ## Pricing
 - Free tier: 10 requests/minute
 - Pro: $9/month for 1000 requests/minute
+
+## Postman
+[![Run in Postman](https://run.pstmn.io/button.svg)](https://raw.githubusercontent.com/BT-Builds/json-schema-validator/main/postman_collection.json)
