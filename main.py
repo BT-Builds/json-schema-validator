@@ -37,6 +37,23 @@ class ValidationResponse(BaseModel):
     errors: Optional[List[str]] = None
     message: str
 
+class BulkValidationItem(BaseModel):
+    schema: Dict[str, Any]
+    data: Any
+
+class BulkValidationRequest(BaseModel):
+    items: List[BulkValidationItem] = Field(..., max_items=1000)
+
+class BulkValidationResult(BaseModel):
+    input: Any
+    output: Optional[Dict[str, Any]] = None
+    error: Optional[str] = None
+
+class BulkValidationResponse(BaseModel):
+    results: List[BulkValidationResult]
+    total: int
+    successful: int
+
 def check_rate_limit(api_key: str) -> bool:
     now = time.time()
     if api_key not in rate_limits:
@@ -164,10 +181,28 @@ async def validate(request: ValidationRequest, api_key: str = Depends(verify_api
     else:
         return ValidationResponse(valid=False, errors=errors, message="Validation failed")
 
+@app.post("/bulk/validate", response_model=BulkValidationResponse)
+async def bulk_validate(request: BulkValidationRequest, api_key: str = Depends(verify_api_key)):
+    results = []
+    successful = 0
+    
+    for item in request.items:
+        result = BulkValidationResult(input=item.data)
+        try:
+            valid, errors = validate_json_schema(item.schema, item.data)
+            result.output = {"valid": valid, "errors": errors, "message": "Data is valid against schema" if valid else "Validation failed"}
+            if valid:
+                successful += 1
+        except Exception as e:
+            result.error = str(e)
+        results.append(result)
+    
+    return BulkValidationResponse(results=results, total=len(results), successful=successful)
+
 @app.get("/")
 async def root():
     return {"service": "JSON Schema Validator API", "version": "1.0.0", 
-            "endpoints": ["/validate", "/health"], "usage": "POST /validate with JSON schema and data"}
+            "endpoints": ["/validate", "/bulk/validate", "/health"], "usage": "POST /validate with JSON schema and data"}
 
 from mangum import Mangum
 handler = Mangum(app)
